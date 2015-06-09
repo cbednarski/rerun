@@ -1,13 +1,14 @@
 package main
 
 import (
-	"crypto/sha256"
+	"crypto/md5"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -16,6 +17,21 @@ func fileExists(path string) bool {
 		return true
 	}
 	return false
+}
+
+func removeTimingInfo(content []byte) []byte {
+	// Match things like 02/15
+	date := regexp.MustCompile("\\d+(/\\d+)+")
+	// Match things like 9:52
+	time := regexp.MustCompile("\\d+(:\\d+)+")
+	// Match things like 2.3s
+	duration := regexp.MustCompile("\\d+(\\.\\d+)[μsmhd]")
+
+	content = date.ReplaceAll(content, nil)
+	content = time.ReplaceAll(content, nil)
+	content = duration.ReplaceAll(content, nil)
+
+	return content
 }
 
 func main() {
@@ -31,6 +47,7 @@ func main() {
 	command := os.Args[1]
 	args := strings.Join(os.Args[2:], " ")
 	terminal := command + " " + args
+	seen := map[string]int{}
 
 	for {
 		total++
@@ -38,7 +55,7 @@ func main() {
 		output, runtimeerr := cmd.CombinedOutput()
 
 		// This is a byte array; we need to convert it to a byte slice
-		hashbin := sha256.Sum256(output)
+		hashbin := md5.Sum(removeTimingInfo(output))
 		outputHash := hex.EncodeToString(hashbin[:])
 		filename := fmt.Sprintf("rerun-failure-%s.log", outputHash)
 
@@ -47,11 +64,21 @@ func main() {
 			log.Printf("%s SUCCEEDED (total: %d, passing: %d, errors: %d)", terminal, total, passes, errors)
 		} else {
 			errors++
-			// log.Printf(runtimeerr.Error())
+
+			value, ok := seen[outputHash]
+			if ok {
+				seen[outputHash] = value + 1
+			} else {
+				seen[outputHash]++
+			}
+
 			log.Printf("%s FAILED (total: %d, passing: %d, errors: %d)", terminal, total, passes, errors)
+			log.Printf("Seen error %s %d times", outputHash, seen[outputHash])
 			if !fileExists(filename) {
 				ioerr := ioutil.WriteFile(filename, output, 0600)
-				if ioerr != nil {
+				if ioerr == nil {
+					log.Printf("Wrote error log to %s", filename)
+				} else {
 					log.Printf("Unable to write error log: %s", ioerr.Error())
 				}
 			}
