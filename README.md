@@ -1,6 +1,12 @@
 # rerun
 
-rerun is a small utility that reruns a command and writes the output to a file whenever the exit status is non-zero. It's intended to help identify tests that fail *sometimes*, and identify other quirky behaviors in distributed systems or applications with non-deterministic scheduling (e.g. threading). rerun will track failures automatically and continue running so you can catch more than one type of periodic failure, and also get a sense for frequency.
+`rerun` is a small utility that reruns a command and writes stdout/stderr to a file whenever the exit code is non-zero.
+
+`rerun` is intended to help identify tests that fail *sometimes*, and other quirky behavior. It automatically tracks failures and collects some basic statistics.
+
+## Installation
+
+    go install github.com/cbednarski/rerun
 
 ## Usage
 
